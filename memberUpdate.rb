@@ -17,15 +17,27 @@ full_hash = JSON.parse(body)
 records_hash = full_hash["Records"]
 
 # Pull in existing JSON file
-
-exist_file = File.read(ENV['JSON_FILE'])
-exist_hash = JSON.parse(exist_file)
+if File.file?(ENV['JSON_FILE'])
+    exist_file = File.read(ENV['JSON_FILE'])
+    exist_hash = JSON.parse(exist_file)
+else 
+    puts "No previous data, creating new data."
+    exist_hash = nil
+    new_info = 1
+end
 
 records_hash.each do |account| 
-    new_info = nil 
-    exist_record = exist_hash.find { |fl| fl["Email"] == account["Email"] }
-    account.keys.each do |key|
-        if account[key] != exist_record[key] && key != "AccessCardId"
+    if exist_hash
+        new_info = nil 
+        exist_record = exist_hash.find { |fl| fl["UniqueId"] == account["UniqueId"] }
+        if exist_record
+            account.keys.each do |key|
+                if account[key] != exist_record[key] && key != "AccessCardId"
+                    exist_record[key] = account[key]
+                    new_info = 1
+                end
+            end
+        else 
             new_info = 1
         end
     end
@@ -44,12 +56,10 @@ records_hash.each do |account|
         account["AccessCardId"] = person_hash["AccessCardId"]
         puts "Access Card now: #{account["AccessCardId"]}"
         sleep 2
-    else
-        puts "No new data for #{account["Email"]}"
     end
 end
 
-File.open(ENV['JSON_FILE'], 'w') do |f|
+File.open(ENV['JSON_FILE'], 'w+') do |f|
     f.write(JSON.pretty_generate(records_hash))
 end
 
