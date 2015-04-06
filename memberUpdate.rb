@@ -4,16 +4,23 @@ require 'dotenv'
 
 Dotenv.load
 
+def call_api(uri_string)
+    uri = URI(uri_string)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    http.use_ssl = true
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request.basic_auth ENV['NEXUDUS_USER'], ENV['NEXUDUS_PASS']
+    response = http.request(request)
+    body = response.body
+    return body
+end
+
+
 # Pull list of all coworkers
-uri = URI('https://spaces.nexudus.com/api/spaces/coworkers?size=1000')
-http = Net::HTTP.new(uri.host, uri.port)
-http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-http.use_ssl = true
-request = Net::HTTP::Get.new(uri.request_uri)
-request.basic_auth ENV['NEXUDUS_USER'], ENV['NEXUDUS_PASS']
-response = http.request(request)
-body = response.body
-full_hash = JSON.parse(body)
+list_uri = 'https://spaces.nexudus.com/api/spaces/coworkers?size=1000'
+list_body = call_api(list_uri)
+full_hash = JSON.parse(list_body)
 records_hash = full_hash["Records"]
 
 # Pull in existing JSON file
@@ -23,7 +30,7 @@ if File.file?(ENV['JSON_FILE'])
 else 
     puts "No previous data, creating new data."
     exist_hash = nil
-    new_info = 1
+    new_info = true
 end
 
 records_hash.each do |account| 
@@ -38,20 +45,14 @@ records_hash.each do |account|
                 end
             end
         else 
-            new_info = 1
+            new_info = true
         end
     end
 
     if new_info
-        person_uri = URI('https://spaces.nexudus.com/api/spaces/coworkers/' + account["Id"].to_s)
-        http = Net::HTTP.new(person_uri.host, person_uri.port)
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-        http.use_ssl = true
-        request = Net::HTTP::Get.new(person_uri.request_uri)
-        request.basic_auth ENV['NEXUDUS_USER'], ENV['NEXUDUS_PASS']
-        response = http.request(request)
-        body = response.body
-        person_hash = JSON.parse(body)
+        person_uri = 'https://spaces.nexudus.com/api/spaces/coworkers/' + account["Id"].to_s
+        person_body = call_api(person_uri)
+        person_hash = JSON.parse(person_body)
         puts "#{account["FullName"]}, #{account["Email"]} ==> Card: #{person_hash["AccessCardId"]}"
         account["AccessCardId"] = person_hash["AccessCardId"]
         puts "Access Card now: #{account["AccessCardId"]}"
